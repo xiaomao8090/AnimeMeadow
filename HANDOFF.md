@@ -250,3 +250,11 @@ Godot 4.7.2（Forward+）项目。地图是无限随机生成的草原（scripts
 - 颜色按高度：底边亮绿（氧 557.7nm）往上变暗，顶部淡红（氧 630nm），活动强时底边镶紫红（氮）；竖条纹只随东西方向变化，透视下往天顶汇聚；侧着看的褶皱更亮
 - 都在北边（-z），活动强度几分钟一个起落，强的时候往南扩、头顶也会出现第三道；在云后面、星星前面
 - 只做了编译检查（本机 Vulkan 无着色器报错），画面没有看过；想调亮度改 `aurora_color` 最后一行，想调颜色改 AUR_GREEN / AUR_RED / AUR_PURPLE
+
+## 宣传片（scripts/trailer.gd）
+
+- `godot --path . --write-movie build/trailer/raw.avi --fixed-fps 30 -- --trailer`（加 `--only=pet,feed` 只拍某几个镜头）；需要临时放一个 override.cfg 把窗口设成 1920x1080、mjpeg_quality=0.95，拍完删掉
+- boot.gd 看到 `--trailer` 就不走加载界面和菜单，固定种子 20261111，18 个镜头按配乐小节排（110 BPM），换地点时黑屏等加载，日志打印 `SHOT 名字 起始帧 结束帧`
+- 角色走路是模拟按住 W / Shift（player.active 打开），站着的镜头关掉
+- build/trailer/ 里（不进 git）：music.py 合成配乐、edit.py 按日志剪辑叠 logo 混音出 mp4、sheets.py 抽帧拼预览图；成片 AnimeMeadow_trailer.mp4
+- 宣传片渲染画面用户允许看，平时开发不看

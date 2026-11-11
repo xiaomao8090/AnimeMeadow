@@ -205,6 +205,7 @@ vec4 march_clouds(vec3 d, vec2 screen_uv) {
 // 帘子被侧着看（褶皱转过来）的地方，视线在里面走得更长，所以更亮 —— 这是真实极光"亮褶"的来源。
 // 地图里 -z 是北，极光都在北边，活动越强越往南扩、越往头顶上来。
 uniform float aurora = 0.0;                  // day_night.gd 设置：雪原权重 × 夜晚
+uniform float aurora_force = -1.0;           // >= 0 时锁定活动强度（宣传片用），-1 = 随时间自己变
 const vec3 AUR_GREEN = vec3(0.16, 1.0, 0.45);
 const vec3 AUR_RED = vec3(0.90, 0.12, 0.26);
 const vec3 AUR_PURPLE = vec3(0.55, 0.18, 0.95);
@@ -278,6 +279,9 @@ vec3 aurora_color(vec3 d) {
 	// 活动强度：几分钟一个起落，偶尔爆发；再叠一点很慢的脉动
 	float act = smoothstep(0.25, 0.8, vnoise(vec2(tm * 0.006, 1.3)));
 	act = clamp(act * 0.85 + 0.15 + 0.06 * sin(tm * 0.7) * act, 0.0, 1.0);
+	if (aurora_force >= 0.0) {
+		act = aurora_force;
+	}
 
 	vec3 col = vec3(0.0);
 	// 主弧：活动越强越往南（越高）

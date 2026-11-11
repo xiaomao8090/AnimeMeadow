@@ -10,6 +10,14 @@ var keep: Array = []        # 加载界面预先加载的资源，留着引用�
 
 
 func _ready() -> void:
+	# 宣传片模式（scripts/trailer.gd）：不走加载界面和主菜单
+	if OS.get_cmdline_user_args().has("--trailer"):
+		var tr := Node.new()
+		tr.name = "Trailer"
+		tr.set_script(load("res://scripts/trailer.gd"))
+		add_child(tr)
+		tr.start(self)
+		return
 	var loader := CanvasLayer.new()
 	loader.name = "Loading"
 	loader.set_script(load("res://scripts/loading.gd"))
