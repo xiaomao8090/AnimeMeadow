@@ -1,0 +1,30 @@
+Sound sources: BBC Sound Effects (https://sound-effects.bbcrewind.co.uk)
+Licence: RemArc — personal, educational or research use only (this project is private use).
+All files are real field recordings, cut / high-passed / loudness-normalised;
+loops are cross-faded so they wrap seamlessly (loops RMS -20 dBFS, one-shots peak -3 dBFS).
+
+  wind_loop.ogg        07030046     Summer, just before dawn: constant quiet wind in trees
+  dawn_loop.ogg        NHU05079179  Dawn chorus: song thrush, blackbird, great tit and others
+  dusk_loop.ogg        NHU05068108  Summer dusk: birds singing and calling, crickets, wind in trees (highs softened)
+  leaves_loop.ogg      07005205     Wind in trees (leaf rustle, played louder near trees)
+  day_loop.ogg         NHU05068117  Summer day: various birds, bees and flies, slight wind in trees
+  crickets_loop.ogg    NHU05068084  Night: tree crickets, wind in trees, distant crickets (highs softened)
+  water_loop.ogg       NHU10263503  Gentle trickling of water of stream (mono, positional)
+  bird_1..2.ogg        NHU05090105  Skylark song
+  bird_3..4.ogg        NHU05066118  Yellowhammer song
+  bird_5..6.ogg        NHU05056085  Song thrush song
+  bird_7.ogg           NHU05097148  Chaffinch, one complete song
+  bird_8..9.ogg        NHU05097138  Robin song
+  bird_10..11.ogg      NHU05097139  Wren song
+  bird_12..14.ogg      NHU05069173  Blackbird song
+  step_grass_1..8.ogg  07041193     Footsteps, one pair of feet walking in grass
+  step_dirt_1..8.ogg   07037051     Footsteps on country road, man walking
+  step_water_1..8.ogg  07041191     Footsteps, one pair of feet walking in shallow water
+
+Synthesized in code (tools/synth_sfx.py, no outside source):
+  step_snow_1..8.ogg   snow crunch footsteps
+  step_sand_1..8.ogg   soft sand footsteps
+  step_ice_1..8.ogg    hard ice footsteps
+  snow_wind_loop.ogg   cold howling wind (snow / ice biomes)
+  desert_wind_loop.ogg low warm wind with blowing sand (desert)
+  ice_ping_1..4.ogg    frozen-lake "pew" (dispersive flexural waves in ice), played far away on the ice field

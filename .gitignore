@@ -1,0 +1,13 @@
+# Godot 缓存（可重新生成）
+.godot/
+
+# 导出产物
+build/*
+!build/.gdignore
+
+# 系统 / 编辑器杂项
+Thumbs.db
+desktop.ini
+.DS_Store
+*.tmp
+*.blend1

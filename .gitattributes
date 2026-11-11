@@ -1,0 +1,7 @@
+# 文本统一 LF，避免 Windows 换行导致整文件 diff
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
+*.ogg binary
+*.glb binary
