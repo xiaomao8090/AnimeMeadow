@@ -104,7 +104,10 @@ void fragment() {
 	// 沙漠：沙地，沙丘顶部亮、背阴面暗一点，加一些风吹出的沙纹
 	float ripple = sin(dot(p, vec2(0.83, 0.55)) * 3.2 + vnoise(p * 0.4) * 6.0) * 0.5 + 0.5;
 	vec3 sand_col = mix(sand_a, sand_b, n * 0.7 + ripple * 0.12);
-	grass = mix(grass, sand_col, bw.g);
+	// 沙漠边上不是平滑渐变：一块块的沙地和草地交错
+	float sedge = vnoise(p * 0.21 + vec2(5.0, 19.0)) * 0.7 + vnoise(p * 1.1) * 0.3 - 0.5;
+	float sand_k = smoothstep(0.3, 0.7, clamp(bw.g + sedge * 1.6 * bw.g * (1.0 - bw.g) * 4.0, 0.0, 1.0));
+	grass = mix(grass, sand_col, sand_k);
 	// 雪原：雪地，背光一侧偏蓝；风吹出的一道道细雪纹（顺着风向）+ 大片很淡的起伏明暗
 	vec2 wd = normalize(wind_dir);
 	vec2 wp = vec2(dot(p, wd), dot(p, vec2(-wd.y, wd.x)));

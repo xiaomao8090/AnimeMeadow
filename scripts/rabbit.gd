@@ -274,6 +274,14 @@ func _hop_logic(delta: float, dir: Vector3, hop_len: float, hop_dist: float, hop
 	if world.has_method("in_pond") and world.in_pond(to.x, to.z):
 		_want_yaw += PI * 0.5
 		return
+	# 不跳进树、石头、冰山里；不是朋友的话也不跑出自己的群系
+	var mid := global_position.lerp(to, 0.5)
+	if world.has_method("blocked_at") and (world.blocked_at(to.x, to.z, 0.25) or world.blocked_at(mid.x, mid.z, 0.25)):
+		_want_yaw += PI * (0.5 if _rng.randf() < 0.5 else -0.5)
+		return
+	if friend_t <= 0.0 and world.has_method("animal_biome_ok") and not world.animal_biome_ok(to.x, to.z):
+		_want_yaw += PI * 0.7
+		return
 	if absf(world.height_raw(to.x, to.z) - global_position.y) > step * 0.9:
 		_want_yaw += PI * 0.5
 		return

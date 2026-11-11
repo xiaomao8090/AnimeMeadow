@@ -217,6 +217,12 @@ func _process(delta: float) -> void:
 		var ahead := global_position + fwd * 1.5
 		var blocked: bool = (world.has_method("in_pond") and world.in_pond(ahead.x, ahead.z)) \
 			or absf(world.height_raw(ahead.x, ahead.z) - global_position.y) > 1.4
+		# 树、石头、冰山挡路就转弯；不是朋友的话不走出自己的群系
+		if not blocked and world.has_method("blocked_at"):
+			var near := global_position + fwd * 0.7
+			blocked = world.blocked_at(ahead.x, ahead.z, 0.45) or world.blocked_at(near.x, near.z, 0.45)
+		if not blocked and friend_t <= 0.0 and world.has_method("animal_biome_ok"):
+			blocked = not world.animal_biome_ok(ahead.x, ahead.z)
 		if blocked:
 			_want_yaw += 1.2
 			if state == "walk":

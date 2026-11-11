@@ -1,4 +1,5 @@
-// 树冠/灌木：团状卡通树叶，颜色来自实例颜色，随风轻轻晃动
+// 树冠里填缝的"芯"：只从叶片之间的缝里看得到，所以画成没有高光、没有明暗分界的一团深色树叶，
+// 不能像实心的球（以前有边缘光和硬的明暗线，看起来像树里塞了块石头）
 shader_type spatial;
 render_mode world_vertex_coords;
 
@@ -23,16 +24,15 @@ void fragment() {
 	vec3 base = COLOR.rgb;
 	// 下暗上亮，模拟树冠内部的遮挡
 	float g = smoothstep(-0.6, 0.8, v_up);
-	vec3 c = mix(base * shade_tint * 0.85, base, g);
+	vec3 c = mix(base * shade_tint * 0.8, base * 0.92, g * 0.6);
 	ALBEDO = c;
 	ROUGHNESS = 1.0;
 	SPECULAR = 0.0;
-	float rim = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 3.0);
-	EMISSION = c * rim * 0.2;
 }
 
 void light() {
+	// 很平的受光：几乎不分亮面暗面，看不出是个球
 	float ndl = dot(NORMAL, LIGHT);
-	float lit = smoothstep(-0.15, -0.09, ndl);
+	float lit = 0.45 + 0.25 * smoothstep(-0.4, 0.6, ndl);
 	DIFFUSE_LIGHT += lit * ATTENUATION * LIGHT_COLOR / PI;
 }

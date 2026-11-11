@@ -14,7 +14,7 @@ const POND_CELL := 320.0            # 每 320x320 米的格子里最多一个池
 const POND_RADIUS := 10.0
 const POND_DEPTH := 0.9
 const WIND_DIR := Vector2(1.0, 0.35)
-const CORE_SCALE := 0.62           # 树冠深色芯相对叶片层的大小，要比叶片层小，免得露出来
+const CORE_SCALE := 0.55           # 树冠里填缝的芯相对叶片层的大小，要小一圈，免得露出来（露出来像树里塞了块石头）
 const TREE_LINE := 95.0            # 高过这里不长树
 const GRASS_LINE := 105.0          # 高过这里草开始变稀，再往上是岩石和雪
 
@@ -55,6 +55,7 @@ var temp_noise := FastNoiseLite.new()       # 群系：温度
 var humid_noise := FastNoiseLite.new()      # 群系：湿度
 var dune_noise := FastNoiseLite.new()       # 沙漠里的沙丘
 var ice_noise := FastNoiseLite.new()        # 冰原上哪里是冰面
+var warp_noise := FastNoiseLite.new()       # 把群系边界扭成弯弯曲曲的形状（不是一条顺滑的线）
 
 var POND_CENTER := Vector2(1e6, 1e6)        # 离玩家最近的池塘（没有就在很远的地方）；ambience.gd 也会读
 var water_level := -1000.0
@@ -346,6 +347,11 @@ func _setup_noise() -> void:
 	dune_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	dune_noise.fractal_type = FastNoiseLite.FRACTAL_NONE
 	dune_noise.frequency = 0.011
+	warp_noise.seed = world_seed + 14
+	warp_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	warp_noise.frequency = 0.009
+	warp_noise.fractal_octaves = 3
+	warp_noise.fractal_gain = 0.5
 	ice_noise.seed = world_seed + 13
 	ice_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	ice_noise.frequency = 0.012
@@ -364,8 +370,9 @@ func mountain_mask(x: float, z: float) -> float:
 ## 由温度和湿度两张很大尺度的噪声决定（一片群系大约 1-2 公里），边界只有 30-50 米的渐变（地面颜色和草的颜色过渡用）。
 ## 树、花、灌木、石头这些东西不按权重混，只看 biome_at() 的那一个群系，各群系的东西不会跑到别的群系里
 func biome_w(x: float, z: float) -> Color:
-	var t := temp_noise.get_noise_2d(x, z) * 1.7
-	var w := humid_noise.get_noise_2d(x, z) * 1.7
+	var c := _climate(x, z)
+	var t := c.x
+	var w := c.y
 	var snow := smoothstep(-0.28, -0.34, t)
 	var desert := smoothstep(0.28, 0.34, t) * smoothstep(0.03, -0.03, w)
 	var autumn := smoothstep(-0.06, -0.12, t) * (1.0 - snow)
@@ -373,10 +380,18 @@ func biome_w(x: float, z: float) -> Color:
 	return Color(snow, desert, autumn, cherry)
 
 
+## 温度和湿度。采样位置先被 warp_noise 推开几十米，边界就变得弯弯曲曲、有凸出的岬角和凹进去的湾
+func _climate(x: float, z: float) -> Vector2:
+	var wx := x + warp_noise.get_noise_2d(x, z) * 45.0
+	var wz := z + warp_noise.get_noise_2d(x + 913.0, z - 377.0) * 45.0
+	return Vector2(temp_noise.get_noise_2d(wx, wz) * 1.7, humid_noise.get_noise_2d(wx, wz) * 1.7)
+
+
 ## 冰原（雪原里比较湿的地方）：0..1
 func ice_w(x: float, z: float) -> float:
-	var t := temp_noise.get_noise_2d(x, z) * 1.7
-	var w := humid_noise.get_noise_2d(x, z) * 1.7
+	var c := _climate(x, z)
+	var t := c.x
+	var w := c.y
 	return smoothstep(-0.36, -0.42, t) * smoothstep(0.07, 0.13, w)
 
 
@@ -587,6 +602,25 @@ func bare_at(x: float, z: float) -> float:
 
 func ice_at(x: float, z: float) -> float:
 	return _bare(x, z, _ponds_at(x, z)).z
+
+
+## 这里有没有树干 / 石头 / 冰山 / 仙人掌 / 灌木（已加载区块里的障碍物），动物走路前用它检查
+func blocked_at(x: float, z: float, rad := 0.3) -> bool:
+	var k := Vector2i(floori(x / CHUNK), floori(z / CHUNK))
+	for dz in range(-1, 2):
+		for dx in range(-1, 2):
+			var ck := k + Vector2i(dx, dz)
+			if not chunks.has(ck):
+				continue
+			if _blocked_r(chunks[ck].blockers, x, z, rad):
+				return true
+	return false
+
+
+## 动物（兔子、小鹿、地上的小鸟）只住在草原、秋林、樱花林；雪原、冰原、沙漠里没有
+func animal_biome_ok(x: float, z: float) -> bool:
+	var b := int(biome_at(x, z).x)
+	return b == 0 or b == 3 or b == 4
 
 
 func in_pond(x: float, z: float) -> bool:
@@ -1200,7 +1234,7 @@ func _add_pine(r: RandomNumberGenerator, x: float, h: float, z: float, snow: flo
 	blockers.append(Vector3(x, z, tr + 0.25))
 	tree_cols.append([x, h, z, tr * 0.85, th + 3.0])
 	var col: Color = PINES[r.randi() % PINES.size()]
-	var core_col := _lin(col.darkened(0.25))
+	var core_col := _lin(col.darkened(0.12))
 	var layers := r.randi_range(4, 5)
 	var canopy := Vector3(x, h + th + 3.0 * tall, z)
 	# 最下面一层树枝的下沿要高过角色的头（约 1.1 米），否则走到树下身体会插进树枝里
@@ -1365,7 +1399,7 @@ func _compute_deco(key: Vector2i) -> Dictionary:
 			base_col = AUTUMN[r.randi() % AUTUMN.size()]
 		elif bid == 4:
 			base_col = SAKURA[r.randi() % SAKURA.size()] if r.randf() < 0.9 else GREENS[r.randi() % GREENS.size()]
-		var core_col := _lin(base_col.darkened(0.22))
+		var core_col := _lin(base_col.darkened(0.1))     # 芯和叶片背光面差不多颜色，从缝里看到的只是更深一点的树叶
 		var big := r.randf_range(2.0, 2.8)
 		var top := Vector3(x, h + th + big * 0.35, z)
 		var canopy := top - Vector3(0.0, big * 0.45, 0.0)
@@ -1373,7 +1407,7 @@ func _compute_deco(key: Vector2i) -> Dictionary:
 		core_x.append(Transform3D(Basis(Vector3.UP, r.randf() * TAU).scaled(rad * CORE_SCALE), top))
 		core_c.append(core_col)
 		crowns.append(Vector3(x, z, big * 1.9))
-		_add_leaf_cards(r, top, rad, canopy, base_col, 50, card_x, card_c, card_d)
+		_add_leaf_cards(r, top, rad, canopy, base_col, 66, card_x, card_c, card_d)
 		var side_n := r.randi_range(4, 6)
 		var a0 := r.randf() * TAU
 		for s in side_n:
@@ -1384,7 +1418,7 @@ func _compute_deco(key: Vector2i) -> Dictionary:
 			var srad := Vector3(sr, sr * 0.85, sr)
 			core_x.append(Transform3D(Basis(Vector3.UP, r.randf() * TAU).scaled(srad * CORE_SCALE), top + off))
 			core_c.append(core_col)
-			_add_leaf_cards(r, top + off, srad, canopy, base_col, 26, card_x, card_c, card_d)
+			_add_leaf_cards(r, top + off, srad, canopy, base_col, 34, card_x, card_c, card_d)
 
 	var trunk_block := blockers.duplicate()    # 到这里为止 blockers 里只有树干：石头只避开树干，石头之间可以挨着堆
 	# ── 灌木：贴地的小团树叶 ──
@@ -1433,6 +1467,8 @@ func _compute_deco(key: Vector2i) -> Dictionary:
 			var scl := Vector3(s * r.randf_range(0.85, 1.25), s * r.randf_range(0.6, 0.95), s * r.randf_range(0.85, 1.25))
 			if _blocked_r(trunk_block, x, z, maxf(scl.x, scl.z)):
 				continue        # 不能长在树干里
+			var rid := int(biome_at(x, z).x)
+			rmat = 1 if (rid == 1 or rid == 5) else (2 if rid == 2 else 0)   # 每块石头按自己所在的群系
 			var b := Basis.from_euler(Vector3(r.randf_range(-0.25, 0.25), r.randf() * TAU, r.randf_range(-0.25, 0.25))) * Basis.from_scale(scl)
 			rocks.append([Transform3D(b, Vector3(x, _grid_h(hs, n, ox, oz, x, z) + scl.y * 0.3, z)), r.randi() % 5, rmat])
 			if rmat == 1:
@@ -1715,11 +1751,12 @@ func _compute_grass(gkey: Vector2i, all_blockers: PackedVector3Array) -> Diction
 		if b.x > ox - b.z and b.x < ox + GCHUNK + b.z and b.y > oz - b.z and b.y < oz + GCHUNK + b.z:
 			blockers.append(b)
 
-	# 群系在 20 米内变化很小：只算四个角，中间插值
-	var c00 := biome_w(ox, oz)
-	var c10 := biome_w(ox + GCHUNK, oz)
-	var c01 := biome_w(ox, oz + GCHUNK)
-	var c11 := biome_w(ox + GCHUNK, oz + GCHUNK)
+	# 群系每 2 米算一个点（和地形顶点一样密），草的颜色和疏密才能和地面对得上
+	var bgw: Array[Color] = []
+	bgw.resize((gn + 1) * (gn + 1))
+	for iz in gn + 1:
+		for ix in gn + 1:
+			bgw[iz * (gn + 1) + ix] = biome_w(ox + ix * CELL, oz + iz * CELL)
 
 	var r := RandomNumberGenerator.new()
 	r.seed = hash(Vector3i(world_seed + 991, gkey.x, gkey.y))
@@ -1738,9 +1775,14 @@ func _compute_grass(gkey: Vector2i, all_blockers: PackedVector3Array) -> Diction
 		var b := bg[mini(int((z - oz) * 2.0), bn - 1) * bn + mini(int((x - ox) * 2.0), bn - 1)]
 		if b > 0.5 or _blocked(blockers, x, z):
 			continue
-		var u := (x - ox) / GCHUNK
-		var v := (z - oz) / GCHUNK
-		var bw := c00.lerp(c10, u).lerp(c01.lerp(c11, u), v)
+		var fx := (x - ox) / CELL
+		var fz := (z - oz) / CELL
+		var gx0 := mini(int(fx), gn - 1)
+		var gz0 := mini(int(fz), gn - 1)
+		fx -= gx0
+		fz -= gz0
+		var gi := gz0 * (gn + 1) + gx0
+		var bw: Color = bgw[gi].lerp(bgw[gi + 1], fx).lerp(bgw[gi + gn + 1].lerp(bgw[gi + gn + 2], fx), fz)
 		# 雪原只有零星露出雪面的草尖，沙漠只有稀疏的干草丛
 		if bw.r > 0.45 or r.randf() < bw.r * 2.0 + bw.g * 0.82:
 			continue

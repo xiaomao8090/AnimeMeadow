@@ -196,6 +196,108 @@ vec4 march_clouds(vec3 d, vec2 screen_uv) {
 	return vec4(acc * horizon_fade, alpha);
 }
 
+// ───────────── 极光 ─────────────
+// 每一道极光是一张竖着的"帘子"：在俯视图上是一条东西走向、弯弯曲曲的线（z = aur_curve(x)），
+// 从离地 aurora_bottom 起往上延伸。视线和帘子的交点处取颜色：
+//   底边最亮的绿色（氧原子 557.7nm，约 100-150 公里高），往上逐渐变暗，顶部转成淡红（氧原子 630nm，200 公里以上），
+//   活动强的时候底边会镶一圈紫红（氮分子）。
+// 帘子上的竖条纹（射线）只随东西方向变化、不随高度变化，透视下自然往天顶汇聚；
+// 帘子被侧着看（褶皱转过来）的地方，视线在里面走得更长，所以更亮 —— 这是真实极光"亮褶"的来源。
+// 地图里 -z 是北，极光都在北边，活动越强越往南扩、越往头顶上来。
+uniform float aurora = 0.0;                  // day_night.gd 设置：雪原权重 × 夜晚
+const vec3 AUR_GREEN = vec3(0.16, 1.0, 0.45);
+const vec3 AUR_RED = vec3(0.90, 0.12, 0.26);
+const vec3 AUR_PURPLE = vec3(0.55, 0.18, 0.95);
+
+float aur_curve(float x, float base, float seed, float tm) {
+	return base
+		+ 5200.0 * sin(x * 0.000045 + seed * 3.1 + tm * 0.010)
+		+ 2200.0 * sin(x * 0.00013 - tm * 0.023 + seed * 7.0)
+		+ 1500.0 * (vnoise(vec2(x * 0.00025 + tm * 0.006, seed * 13.0)) - 0.5);
+}
+
+vec3 aur_curtain(vec3 d, float base, float seed, float tm, float act) {
+	if (d.z > -0.02 || d.y < -0.02) {
+		return vec3(0.0);
+	}
+	// 视线在俯视图上是 x = s·z 这条线，用牛顿法找它和帘子曲线的交点
+	float s = d.x / d.z;
+	float z = base;
+	for (int i = 0; i < 5; i++) {
+		float xi = s * z;
+		float c = aur_curve(xi, base, seed, tm);
+		float dc = (aur_curve(xi + 40.0, base, seed, tm) - c) / 40.0;
+		float hp = 1.0 - s * dc;
+		hp = (hp < 0.0 ? -1.0 : 1.0) * max(abs(hp), 0.3);
+		z -= clamp((z - c) / hp, -12000.0, 12000.0);
+	}
+	float x = s * z;
+	float c = aur_curve(x, base, seed, tm);
+	if (abs(z - c) > 500.0 || z > -500.0) {
+		return vec3(0.0);
+	}
+	float dc = (aur_curve(x + 40.0, base, seed, tm) - c) / 40.0;
+	float t = z / d.z;
+	float h = cloud_alt(d * t);
+
+	// 底边高度沿着帘子起伏
+	float bottom = 3600.0 + 1000.0 * vnoise(vec2(x * 0.0004 + tm * 0.01, seed * 4.0));
+	float hh = (h - bottom) / 9000.0;
+	if (hh < -0.06 || hh > 1.3) {
+		return vec3(0.0);
+	}
+
+	// 竖条纹：沿着帘子慢慢流动，活动强时流得快；每根射线顶端高低不同
+	float ax = x + tm * 35.0 * (0.4 + act);
+	float r1 = vnoise(vec2(ax * 0.0021, seed * 5.0));
+	float r2 = vnoise(vec2(ax * 0.0090, seed * 9.0 + 3.0));
+	float fine = 1.0 - smoothstep(25000.0, 60000.0, t);      // 太远的细条纹会闪，淡掉
+	float rays = 0.22 + 1.1 * (r1 * r1 * 0.65 + r2 * r2 * 0.35 * fine);
+	float ray_top = mix(0.30, 1.0, vnoise(vec2(ax * 0.0013, seed * 2.0 + 5.0)));
+
+	// 高度上的颜色分布
+	float hc = max(hh, 0.0);
+	float green = smoothstep(-0.05, 0.015, hh) * exp(-hc * 3.0 / ray_top);
+	float red = smoothstep(0.12, 0.55, hh) * exp(-max(hh - 0.5, 0.0) * 2.2) * 0.30 * ray_top;
+	float purple = exp(-abs(hh) * 45.0) * smoothstep(0.45, 0.9, act) * 0.55;
+
+	// 沿帘子一块亮一块暗，慢慢变化
+	float patchy = 0.30 + 0.70 * smoothstep(0.25, 0.75, vnoise(vec2(x * 0.00012 - tm * 0.02, seed * 3.0)));
+
+	// 视线穿过帘子的路径长度：越是侧着看越长越亮
+	vec2 n = normalize(vec2(-dc, 1.0));
+	float path = min(1.0 / max(abs(dot(n, d.xz)), 0.08), 4.5);
+
+	vec3 e = (AUR_GREEN * green + AUR_RED * red + AUR_PURPLE * purple) * rays * patchy * path;
+	// 很远的极光被大气吃掉一部分
+	return e * exp(-t / 70000.0);
+}
+
+vec3 aurora_color(vec3 d) {
+	float tm = TIME;
+	// 活动强度：几分钟一个起落，偶尔爆发；再叠一点很慢的脉动
+	float act = smoothstep(0.25, 0.8, vnoise(vec2(tm * 0.006, 1.3)));
+	act = clamp(act * 0.85 + 0.15 + 0.06 * sin(tm * 0.7) * act, 0.0, 1.0);
+
+	vec3 col = vec3(0.0);
+	// 主弧：活动越强越往南（越高）
+	col += aur_curtain(d, mix(-32000.0, -15000.0, act), 1.0, tm, act);
+	// 远处低空的一道
+	col += aur_curtain(d, -52000.0, 2.0, tm * 1.15, act) * 0.6;
+	// 活动强的时候头顶上也会出现
+	float hi = smoothstep(0.55, 0.9, act);
+	if (hi > 0.0) {
+		col += aur_curtain(d, mix(-12000.0, -5000.0, hi), 3.0, tm * 0.9, act) * 0.85 * hi;
+	}
+	// 北边低空一层淡淡的弥散绿光
+	col += AUR_GREEN * 0.04 * act * exp(-max(d.y, 0.0) * 6.0)
+		* smoothstep(0.1, -0.6, d.z) * smoothstep(-0.02, 0.05, d.y);
+
+	// 地平线附近穿过的大气更厚，压暗
+	col *= smoothstep(-0.02, 0.06, d.y);
+	return col * (0.35 + 0.35 * act);
+}
+
 void sky() {
 	vec3 d = normalize(EYEDIR);
 	if (AT_HALF_RES_PASS) {
@@ -229,6 +331,11 @@ void sky() {
 	float md = dot(d, moon_dir);
 	col += vec3(0.5, 0.62, 1.0) * pow(max(md, 0.0), 40.0) * 0.3 * night;
 	col = mix(col, vec3(1.0, 1.0, 0.92) * 1.4, smoothstep(0.9990, 0.9993, md) * night);
+
+	// 极光在星星和月亮前面、云后面
+	if (aurora > 0.005 && !AT_CUBEMAP_PASS) {
+		col += aurora_color(d) * aurora;
+	}
 
 	// 体积云在半分辨率通道里算好（预乘颜色 + 不透明度），这里叠到天空上
 	if (!AT_CUBEMAP_PASS) {

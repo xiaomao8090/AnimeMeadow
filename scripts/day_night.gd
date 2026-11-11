@@ -114,6 +114,9 @@ func _apply() -> void:
 		horizon = horizon.lerp(horizon.lerp(Color(0.90, 0.94, 1.0), day), w * 0.55)
 		top = top.lerp(top.lerp(Color(0.52, 0.66, 0.90), day), w * 0.35)
 	env.ambient_light_color = _mix(AMBIENT, dusk).lerp(Color(0.72, 0.80, 1.0), w * 0.5)
+	# 极光：雪原的夜里出现，雪地被映上一点点绿
+	var aur := w * night
+	env.ambient_light_color = env.ambient_light_color.lerp(Color(0.42, 0.95, 0.66), aur * 0.14)
 	env.ambient_light_energy = (AMBIENT_ENERGY[0] * day + AMBIENT_ENERGY[1] * dusk + AMBIENT_ENERGY[2] * night) * (1.0 + 0.25 * w)
 	env.fog_density = 0.0021 + 0.0042 * w
 	env.adjustment_saturation = 1.15 - 0.12 * w
@@ -128,3 +131,4 @@ func _apply() -> void:
 	sky_mat.set_shader_parameter("sun_dir", sun_dir)
 	sky_mat.set_shader_parameter("moon_dir", moon_dir)
 	sky_mat.set_shader_parameter("night", night)
+	sky_mat.set_shader_parameter("aurora", aur)

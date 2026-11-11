@@ -137,6 +137,10 @@ func _spawn_group(p: Vector3) -> void:
 func _good(x: float, z: float) -> bool:
 	if world.has_method("in_pond") and world.in_pond(x, z):
 		return false
+	if world.has_method("animal_biome_ok") and not world.animal_biome_ok(x, z):
+		return false        # 雪原、冰原、沙漠里不刷动物
+	if world.has_method("blocked_at") and world.blocked_at(x, z, 0.6):
+		return false        # 不刷在树、石头、冰山里
 	if world.has_method("bare_at") and world.bare_at(x, z) > 0.5:
 		return false
 	var h: float = world.height_raw(x, z)

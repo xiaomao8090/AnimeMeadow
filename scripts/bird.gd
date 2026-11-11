@@ -172,6 +172,8 @@ func _ground(x: float, z: float) -> float:
 func _ok(x: float, z: float) -> bool:
 	if world.has_method("in_pond") and world.in_pond(x, z):
 		return false
+	if world.has_method("blocked_at") and world.blocked_at(x, z, 0.15):
+		return false
 	return true
 
 
