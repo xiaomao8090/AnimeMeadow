@@ -4,6 +4,8 @@
 
 一片走不到尽头的草原
 
+中文 | [English](README.en.md) | [Русский](README.ru.md)
+
 ![Engine](https://img.shields.io/badge/Godot-4.7-478CBF?logo=godotengine&logoColor=white)
 ![Platform](https://img.shields.io/badge/platform-Windows-0078D6)
 ![Status](https://img.shields.io/badge/status-in%20development-E8A33D)
