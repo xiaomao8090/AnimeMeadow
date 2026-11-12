@@ -1784,7 +1784,7 @@ func _compute_grass(gkey: Vector2i, all_blockers: PackedVector3Array) -> Diction
 		var gi := gz0 * (gn + 1) + gx0
 		var bw: Color = bgw[gi].lerp(bgw[gi + 1], fx).lerp(bgw[gi + gn + 1].lerp(bgw[gi + gn + 2], fx), fz)
 		# 雪原只有零星露出雪面的草尖，沙漠只有稀疏的干草丛
-		if bw.r > 0.45 or r.randf() < bw.r * 2.0 + bw.g * 0.82:
+		if bw.r > 0.45 or r.randf() < bw.r * 2.0 + (0.97 if bw.g > 0.7 else bw.g * 0.9):     # 沙漠深处只剩零星的干草
 			continue
 		var y := _grid_h(hs, gn, ox, oz, x, z)
 		# 陡坡是岩石，高处是岩石和雪：坡越陡、越高，草越稀
